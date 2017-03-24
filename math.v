@@ -110,6 +110,7 @@ module datapath(
         end
     end
  
+ 
     // Output result register
     always @ (posedge clk) begin
         if (!resetn) begin
