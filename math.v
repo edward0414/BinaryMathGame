@@ -89,6 +89,7 @@ module datapath(
     // alu input muxes
     reg [7:0] alu_a, alu_b;
     
+    
     // Registers a, b, c, x with respective input logic
     always @ (posedge clk) begin
         if (!resetn) begin
