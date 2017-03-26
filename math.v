@@ -73,97 +73,95 @@ module datapath(
     input clk,
     input resetn,
     input [7:0] data_in,
-    input ld_alu_out, 
-    input ld_x, ld_a, ld_b, ld_c,
-    input ld_r,
+    input ld_ans,
     input alu_op, 
-    input [1:0] alu_select_a, alu_select_b,
-    output reg [7:0] data_result
+    input enable,
+    output reg [7:0] data_result,
+    output reg [2:0] score,
+    output reg [1:0] time
     );
     
     // input registers
-    reg [7:0] a, b, c, x;
+    reg [7:0] in, q1, q2, temp_q1, temp_q2;
+
+    // time, scoreboard
+    reg [1:0] time;
+    reg [2:0] score;
+
+    // alu_op
+    reg [1:0] alu_op, temp_op;
+
 
     // output of the alu
     reg [7:0] alu_out;
-    // alu input muxes
-    reg [7:0] alu_a, alu_b;
-    
-    
+
+    //Random number generator (Questions)
+
+    //Random number generator (ALU_OP)
+
+
     // Registers a, b, c, x with respective input logic
     always @ (posedge clk) begin
         if (!resetn) begin
-            a <= 8'd0; 
-            b <= 8'd0; 
-            c <= 8'd0; 
-            x <= 8'd0; 
+            in <= 8'd0; 
+            q1 <= 8'd0; 
+            q2 <= 8'd0;  
         end
         else begin
-            if (ld_a)
-                a <= ld_alu_out ? alu_out : data_in; // load alu_out if load_alu_out signal is high, otherwise load from data_in
-            if (ld_b)
-                b <= ld_alu_out ? alu_out : data_in; // load alu_out if load_alu_out signal is high, otherwise load from data_in
-            if (ld_x)
-                x <= data_in;
-
-            if (ld_c)
-                c <= data_in;
+            if (ld_ans)
+                in <= data_in;
+                q1 <= temp_q1;
+                q2 <= temp_q2;
+                alu_op <= temp_op;
         end
     end
  
  
-    // Output result register
+    //8-bit comparator
+
+    //Score_counter
     always @ (posedge clk) begin
-        if (!resetn) begin
-            data_result <= 8'd0; 
+        if (!reset) begin
+            score <= 3'd0;
+            end
+        else begin
+            if (enable)
+            score <= score + 3'd1;
         end
-        else 
-            if(ld_r)
-                data_result <= alu_out;
     end
 
-    // The ALU input multiplexers
-    always @(*)
-    begin
-        case (alu_select_a)
-            2'd0:
-                alu_a = a;
-            2'd1:
-                alu_a = b;
-            2'd2:
-                alu_a = c;
-            2'd3:
-                alu_a = x;
-            default: alu_a = 8'd0;
-        endcase
-
-        case (alu_select_b)
-            2'd0:
-                alu_b = a;
-            2'd1:
-                alu_b = b;
-            2'd2:
-                alu_b = c;
-            2'd3:
-                alu_b = x;
-            default: alu_b = 8'd0;
-        endcase
+    //Time_counter
+    always @ (posedge clk) begin
+        if (!reset) begin
+            time <= 2'd30;
+            end
+        else begin
+            if (enable)
+            time <= time - 2'd1;
+        end
     end
+
+    //RIP_counter
 
     // The ALU 
     always @(*)
     begin : ALU
         // alu
         case (alu_op)
-            0: begin
-                   alu_out = alu_a + alu_b; //performs addition
-               end
-            1: begin
-                   alu_out = alu_a * alu_b; //performs multiplication
-               end
+            2'b00: begin
+                   alu_out = q1 + q2; //performs addition
+                end
+            2'b01: begin
+                   alu_out = q1 * q2; //performs multiplication
+                end
+            2'b11: begin
+                   alu_out = q1 - q2; //performs multiplication
+                end
             default: alu_out = 8'd0;
         endcase
     end
+
+    //
     
 endmodule
 
