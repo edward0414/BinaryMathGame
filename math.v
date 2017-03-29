@@ -350,6 +350,7 @@ module datapath( clk, resetn, data_in, ld_ans, ld_q1, ld_q2, show_q, score, high
     end
 
 
+
     //Random number generator (ALU_OP)
     always @(posedge clk)
     begin
