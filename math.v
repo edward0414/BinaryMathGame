@@ -201,19 +201,25 @@ module control(clk, resetn, show_q, go, go1, go2, ld_q1, ld_q2, ld_ans);
 	reg [3:0] current_state, next_state;
 	
 	localparam 	Q1_GEN = 4'd0,
-                Q2_GEN = 4'd1,
-                DISPLAY= 4'd2,
-                LOAD_NUM = 4'd3,
-				LOAD_NUM_WAIT = 4'd4,
-				RIP = 4'd5;
+                Q1_GEN_WAIT = 4'd1,
+                Q2_GEN = 4'd2,
+                Q2_GEN_WAIT = 4'd3,
+                DISPLAY = 4'd4,
+                DISPLAY_WAIT = 4'd5,
+                LOAD_NUM = 4'd6,
+				LOAD_NUM_WAIT = 4'd7,
+				RIP = 4'd8;
 
 
 	always @(*)
 	begin: state_table
 		case (current_state)
-            Q1_GEN: next_state = go ? Q1_GEN : Q2_GEN;
-            Q2_GEN: next_state = go ? Q2_GEN : DISPLAY;
-            DISPLAY: next_state = go1 ? LOAD_NUM : DISPLAY;
+            Q1_GEN: next_state = go ? Q1_GEN_WAIT : Q1_GEN;
+            Q1_GEN_WAIT: next_state = go ? Q1_GEN_WAIT : Q2_GEN; 
+            Q2_GEN: next_state = go ? Q2_GEN_WAIT : Q2_GEN;
+            Q2_GEN_WAIT: next_state = go ? Q2_GEN_WAIT : DISPLAY;
+            DISPLAY: next_state = go1 ? DISPLAY_WAIT : DISPLAY;
+            DISPLAY_WAIT: next_state = go1 DISPLAY_WAIT : LOAD_NUM?
 			LOAD_NUM: next_state = go2 ? LOAD_NUM_WAIT : LOAD_NUM;
 			LOAD_NUM_WAIT: next_state = go2 ? LOAD_NUM_WAIT : RIP;
 			RIP: next_state = Q1_GEN;
@@ -231,10 +237,10 @@ module control(clk, resetn, show_q, go, go1, go2, ld_q1, ld_q2, ld_ans);
         show_q = 1'b0;
 
         case (current_state)
-            Q1_GEN: begin
+            Q1_GEN_WAIT: begin
                 ld_q1 = 1'b1;
                 end
-            Q2_GEN: begin
+            Q2_GEN_WAIT: begin
                 ld_q2 = 1'b1;
                 end
             DISPLAY: begin
