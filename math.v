@@ -90,7 +90,7 @@ module math(
     // for the VGA controller, in addition to any other functionality your design may require.
     
     wire [7:0] score;
-    wire [7:0] time1;
+    wire [7:0] timer;
     wire [7:0] high_score;
     wire show_q, ld_q1, ld_q2, ld_ans;
    
@@ -108,7 +108,7 @@ module math(
         .show_q(show_q),
         .score(score),
         .high_score(high_score),
-        .time1(time1)
+        .timer(timer)
     );	 
 	 
 	 
@@ -135,12 +135,12 @@ module math(
         );
 
     hex_decoder H2(
-        .hex_digit(time1[3:0]), 
+        .hex_digit(timer[3:0]), 
         .segments(HEX2)
         );
         
     hex_decoder H3(
-        .hex_digit(time1[7:4]), 
+        .hex_digit(timer[7:4]), 
         .segments(HEX3)
         );
 
@@ -189,6 +189,7 @@ module control(clk, resetn, show_q, go, go1, go2, ld_q1, ld_q2, ld_ans);
     input go;
     input go1;
     input go2;
+    input correct, black, rip_done;
 
 
     output reg ld_q1;
@@ -221,8 +222,11 @@ module control(clk, resetn, show_q, go, go1, go2, ld_q1, ld_q2, ld_ans);
             DISPLAY: next_state = go1 ? DISPLAY_WAIT : DISPLAY;
             DISPLAY_WAIT: next_state = go1 DISPLAY_WAIT : LOAD_NUM?
 			LOAD_NUM: next_state = go2 ? LOAD_NUM_WAIT : LOAD_NUM;
-			LOAD_NUM_WAIT: next_state = go2 ? LOAD_NUM_WAIT : RIP;
-			RIP: next_state = Q1_GEN;
+			LOAD_NUM_WAIT: next_state = go2 ? LOAD_NUM_WAIT : RESULT;
+            RESULT: next_state = correct? ERASE : RIP;
+			RIP: next_state = rip_done? Q1_GEN : RIP;
+            ERASE: next_state = black ? Q1_GEN : ERASE;
+
 		default: next_state = Q1_GEN;
 		endcase
 	end
@@ -249,6 +253,9 @@ module control(clk, resetn, show_q, go, go1, go2, ld_q1, ld_q2, ld_ans);
             LOAD_NUM: begin
                 ld_ans = 1'b1;
                 end
+            ERASE: begin
+                erase = 1'b1;
+                end
             //RIP: begin
                 //rip_time = 1'b1;
                 //erase = 1'b1;
@@ -270,7 +277,7 @@ module control(clk, resetn, show_q, go, go1, go2, ld_q1, ld_q2, ld_ans);
 endmodule
    
 
-module datapath( clk, resetn, data_in, ld_ans, ld_q1, ld_q2, show_q, score, high_score, time1);
+module datapath( clk, resetn, data_in, ld_ans, ld_q1, ld_q2, show_q, score, high_score, timer, );
 
     input clk;
     input resetn;
@@ -281,7 +288,7 @@ module datapath( clk, resetn, data_in, ld_ans, ld_q1, ld_q2, show_q, score, high
     input show_q;
     output reg [7:0] score = 0;
     output reg [7:0] high_score = 0;
-    output reg [7:0] time1 = 30;
+    output reg [7:0] timer = 30;
     
 	 
 	 
@@ -423,13 +430,13 @@ module datapath( clk, resetn, data_in, ld_ans, ld_q1, ld_q2, show_q, score, high
     begin
         if (resetn == 1'b0)
 			begin
-				time1 <= 8'b0001_1110;
+				timer <= 8'b0001_1110;
 				counter <= 1'd0;
 			end
 		  else if (show_q) begin
 			  if (counter == 27'b0) begin
 					 counter <= 49_999_999;
-					 time1 <= time1 - 1'b1;
+					 timer <= timer - 1'b1;
 					 end
 			  else
 					begin
@@ -438,7 +445,7 @@ module datapath( clk, resetn, data_in, ld_ans, ld_q1, ld_q2, show_q, score, high
 			end
 	end
 	
-	//assign rip_act = (time1 == 8'b0)? 1 : 0;
+	//assign rip_act = (timer == 8'b0)? 1 : 0;
 
     /*
     // x reset counter, different case for different number
@@ -480,7 +487,7 @@ module datapath( clk, resetn, data_in, ld_ans, ld_q1, ld_q2, show_q, score, high
     end
     */
 
-    /*
+    
     //RIP_activation
 
     //RIP_counter
@@ -492,8 +499,7 @@ module datapath( clk, resetn, data_in, ld_ans, ld_q1, ld_q2, show_q, score, high
     assign y_out = erase ? reset_counter2: alu_y_out;
     assign colour_out = erase ? 3'b000: colour_in;
     assign black = !reset_counter1 & !reset_counter2;
-    assign finish = draw_counter[0] & draw_counter[1] & draw_counter[2] & draw_counter[3];
-    */
+    //assign finish = draw_counter[0] & draw_counter[1] & draw_counter[2] & draw_counter[3];
     
 endmodule
 
