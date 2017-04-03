@@ -4,6 +4,8 @@
 //go2: enter your answer  KEY[1]
 //resetn               KEY[0]
 //data_in              SW[7-0]
+//Enter your answer when the question shows up. If correct, screen turns black and you get one point. Restart.
+//If not correct, screen turns rip. You have to manually reset.
 
 module math(
         CLOCK_50,                       //  On Board 50 MHz
@@ -11,14 +13,14 @@ module math(
         KEY,
         SW,
         // The ports below are for the VGA output.  Do not change.
-        //VGA_CLK,                        //  VGA Clock
-        //VGA_HS,                         //  VGA H_SYNC
-        //VGA_VS,                         //  VGA V_SYNC
-        //VGA_BLANK_N,                        //  VGA BLANK
-        //VGA_SYNC_N,                     //  VGA SYNC
-        //VGA_R,                          //  VGA Red[9:0]
-        //VGA_G,                          //  VGA Green[9:0]
-        //VGA_B,                           //  VGA Blue[9:0]
+        VGA_CLK,                        //  VGA Clock
+        VGA_HS,                         //  VGA H_SYNC
+        VGA_VS,                         //  VGA V_SYNC
+        VGA_BLANK_N,                        //  VGA BLANK
+        VGA_SYNC_N,                     //  VGA SYNC
+        VGA_R,                          //  VGA Red[9:0]
+        VGA_G,                          //  VGA Green[9:0]
+        VGA_B,                           //  VGA Blue[9:0]
         HEX0,
         HEX1,
         HEX2,
@@ -37,7 +39,7 @@ module math(
     wire clk;
     assign clk = CLOCK_50;
 
-    /*
+
     // Declare your inputs and outputs here
     // Do not change the following outputs
     output          VGA_CLK;                //  VGA Clock
@@ -48,18 +50,16 @@ module math(
     output  [9:0]   VGA_R;                  //  VGA Red[9:0]
     output  [9:0]   VGA_G;                  //  VGA Green[9:0]
     output  [9:0]   VGA_B;                  //  VGA Blue[9:0]
-    */
     
-    /*
+
     // Create the colour, x, y and writeEn wires that are inputs to the controller.
     wire [2:0] colour;
     wire [7:0] x;
     wire [6:0] y;
     wire writeEn;
-    */
 
 
-    /*
+    
     // Create an Instance of a VGA controller - there can be only one!
     // Define the number of colours as well as the initial background
     // image file (.MIF) for the controller.
@@ -83,7 +83,7 @@ module math(
         defparam VGA.MONOCHROME = "FALSE";
         defparam VGA.BITS_PER_COLOUR_CHANNEL = 1;
         defparam VGA.BACKGROUND_IMAGE = "black.mif";
-    */
+    
       
 
     // Put your code here. Your code should produce signals x,y,colour and writeEn/plot
@@ -125,22 +125,22 @@ module math(
         );
 
     hex_decoder H0(
-        .hex_digit(score[3:0]), 
+        .hex_digit(timer[3:0]), 
         .segments(HEX0)
         );
         
     hex_decoder H1(
-        .hex_digit(score[7:4]), 
+        .hex_digit(timer[7:4]), 
         .segments(HEX1)
         );
 
     hex_decoder H2(
-        .hex_digit(timer[3:0]), 
+        .hex_digit(score[3:0]), 
         .segments(HEX2)
         );
         
     hex_decoder H3(
-        .hex_digit(timer[7:4]), 
+        .hex_digit(score[7:4]), 
         .segments(HEX3)
         );
 
@@ -182,22 +182,22 @@ module hex_decoder(hex_digit, segments);
         endcase
 endmodule
 
-module control(clk, resetn, show_q, go, go1, go2, ld_q1, ld_q2, ld_ans);
+module control(clk, resetn, go, go1, go2, correct, black, rip_act, finish, ld_q1, ld_q2, ld_ans, erase, show_q, rip_draw);
 
     input clk;
     input resetn;
     input go;
     input go1;
     input go2;
-    input correct, black, rip_done;
+    input correct, black,, rip_act, finish;
 
 
     output reg ld_q1;
     output reg ld_q2;
-    output reg  ld_ans; 
-    //output reg rip_time;
-    //output reg erase; 
+    output reg ld_ans;
+    output reg erase; 
     output reg show_q;
+    output reg rip_draw;
 
 	reg [3:0] current_state, next_state;
 	
@@ -207,9 +207,12 @@ module control(clk, resetn, show_q, go, go1, go2, ld_q1, ld_q2, ld_ans);
                 Q2_GEN_WAIT = 4'd3,
                 DISPLAY = 4'd4,
                 DISPLAY_WAIT = 4'd5,
-                LOAD_NUM = 4'd6,
-				LOAD_NUM_WAIT = 4'd7,
-				RIP = 4'd8;
+                DISPLAY_DONE =4'd6,
+                OPERATOR = 4'd7,
+                OPERATOR_DONE = 4'd8,
+                LOAD_NUM = 4'd9,
+				LOAD_NUM_WAIT = 4'd10,
+				RIP = 4'd11;
 
 
 	always @(*)
@@ -220,12 +223,16 @@ module control(clk, resetn, show_q, go, go1, go2, ld_q1, ld_q2, ld_ans);
             Q2_GEN: next_state = go ? Q2_GEN_WAIT : Q2_GEN;
             Q2_GEN_WAIT: next_state = go ? Q2_GEN_WAIT : DISPLAY;
             DISPLAY: next_state = go1 ? DISPLAY_WAIT : DISPLAY;
-            DISPLAY_WAIT: next_state = go1 DISPLAY_WAIT : LOAD_NUM?
+            DISPLAY_WAIT: next_state = go1? DISPLAY_WAIT : DISPLAY_PLOT;
+            DISPLAY_DONE: next_state = q_finish? OPERATOR : DISPLAY_PLOT;
+            OPERATOR: next_state = OPERATOR_PLOT;
+            OPERATOR_DONE: next_state = o_finish? LOAD_NUM: OPERATOR_PLOT;
 			LOAD_NUM: next_state = go2 ? LOAD_NUM_WAIT : LOAD_NUM;
 			LOAD_NUM_WAIT: next_state = go2 ? LOAD_NUM_WAIT : RESULT;
             RESULT: next_state = correct? ERASE : RIP;
-			RIP: next_state = rip_done? Q1_GEN : RIP;
             ERASE: next_state = black ? Q1_GEN : ERASE;
+            RIP: next_state = RIP;
+
 
 		default: next_state = Q1_GEN;
 		endcase
@@ -239,6 +246,10 @@ module control(clk, resetn, show_q, go, go1, go2, ld_q1, ld_q2, ld_ans);
         ld_q2 = 1'b0;
         ld_ans = 1'b0;
         show_q = 1'b0;
+        plot = 1'b0;
+        erase = 1'b0;
+        rip_draw = 1'b0;
+        operator = 1'b0;
 
         case (current_state)
             Q1_GEN_WAIT: begin
@@ -247,37 +258,44 @@ module control(clk, resetn, show_q, go, go1, go2, ld_q1, ld_q2, ld_ans);
             Q2_GEN_WAIT: begin
                 ld_q2 = 1'b1;
                 end
-            DISPLAY: begin
+            DISPLAY_DONE: begin
                 show_q = 1'b1;
+                plot = 1'b1;
+                end
+            OPERATOR_DONE: begin
+                operator = 1'b1;
+                plot = 1'b1;
                 end
             LOAD_NUM: begin
                 ld_ans = 1'b1;
                 end
             ERASE: begin
                 erase = 1'b1;
+                plot = 1'b1;
                 end
-            //RIP: begin
-                //rip_time = 1'b1;
-                //erase = 1'b1;
-                //set cur_score if right
-                //set rip_counter to nanosec if right, 120 sec if wrong
-            //end
+            RIP: begin
+                rip_draw = 1'b1;
+                plot = 1'b1;
+            end
 
         endcase
     end
 
-        // current_state registers
-    always@(posedge clk)
+    // current_state registers
+    always@(posedge clock)
     begin: state_FFs
-        if(!resetn)
-            current_state <= Q1_GEN;
-        else
+        if(!reset_n)
+            current_state <= ERASE;
+        else if (rip_act)
+            current_state <= RIP;
+        else 
             current_state <= next_state;
     end // state_FFS
 endmodule
    
 
-module datapath( clk, resetn, data_in, ld_ans, ld_q1, ld_q2, show_q, score, high_score, timer, );
+module datapath(clk, resetn, data_in, ld_ans, ld_q1, ld_q2, show_q, score, high_score, timer, erase, operator, rip_draw, 
+    q_finish, o_finish, black, rip_act);
 
     input clk;
     input resetn;
@@ -286,19 +304,29 @@ module datapath( clk, resetn, data_in, ld_ans, ld_q1, ld_q2, show_q, score, high
     input ld_q1;
     input ld_q2;
     input show_q;
+    input erase;
+    input operator;
+    input rip_draw;
     output reg [7:0] score = 0;
     output reg [7:0] high_score = 0;
     output reg [7:0] timer = 30;
     
-	 
+
+    output q_finish, o_finish, black, rip_act;
+    output [7:0] x_out;
+    output [6:0] y_out;
+    output [2:0] colour_out;
+
+    
 	 
     // wire
     wire better, correct;
 	
     // input registers
-    reg [7:0] in, q1, q2; 
-    reg [7:0] temp_q1 = 255;
-    reg [7:0] temp_q2 = 255;
+    reg [7:0] in;
+    reg [3:0] q1, q2; 
+    reg [3:0] temp_q1 = 15;
+    reg [3:0] temp_q2 = 15;
 
     // time, scoreboard
     reg [27:0] counter;
@@ -312,23 +340,19 @@ module datapath( clk, resetn, data_in, ld_ans, ld_q1, ld_q2, show_q, score, high
 
 
     //Random number generator (Q1)
-    wire feedback = temp_q1[7];
+    wire feedback = temp_q1[3];
 
     always @(posedge clk)
     begin
       temp_q1[0] <= feedback;
       temp_q1[1] <= temp_q1[0];
-      temp_q1[2] <= temp_q1[1] ^ feedback;
+      temp_q1[2] <= temp_q1[1];
       temp_q1[3] <= temp_q1[2] ^ feedback;
-      temp_q1[4] <= temp_q1[3] ^ feedback;
-      temp_q1[5] <= temp_q1[4];
-      temp_q1[6] <= temp_q1[5];
-      temp_q1[7] <= temp_q1[6];
     end
 
     always @ (posedge clk) begin
         if (!resetn) begin
-            q1 <= 8'b0;
+            q1 <= 1'b0;
         end
         else begin
             if (ld_q1)
@@ -338,23 +362,19 @@ module datapath( clk, resetn, data_in, ld_ans, ld_q1, ld_q2, show_q, score, high
 
 
     //Random number generator (Q2)
-    wire feedback2 = temp_q2[7];
+    wire feedback2 = temp_q2[3];
 
     always @(posedge clk)
     begin
       temp_q2[0] <= feedback2;
       temp_q2[1] <= temp_q2[0];
-      temp_q2[2] <= temp_q2[1] ^ feedback2;
+      temp_q2[2] <= temp_q2[1];
       temp_q2[3] <= temp_q2[2] ^ feedback2;
-      temp_q2[4] <= temp_q2[3] ^ feedback2;
-      temp_q2[5] <= temp_q2[4];
-      temp_q2[6] <= temp_q2[5];
-      temp_q2[7] <= temp_q2[6];
     end
 
     always @ (posedge clk) begin
         if (!resetn) begin
-            q2 <= 8'b0;
+            q2 <= 1'b0;
         end
         else begin
             if (ld_q2)
@@ -385,27 +405,37 @@ module datapath( clk, resetn, data_in, ld_ans, ld_q1, ld_q2, show_q, score, high
     end
  
 
+    reg op_plus, op_minus, op_multiply;
      // The ALU 
     always @(*)
-    begin : ALU
+    begin
         // alu
         case (alu_op)
             2'b10: begin
                    alu_out = q1 + q2; //performs addition
+                   op_plus = 1'b1;
                 end
             2'b01: begin
                    alu_out = q1 * q2; //performs multiplication
+                   op_multiply = 1'b1;
                 end
             2'b11: begin
                    alu_out = q1 - q2; //performs subtraction
+                   op_minus = 1'b1;
                 end
-            default: alu_out = 8'b0;
+            default: begin
+                    alu_out = 8'b0;
+                    op_minus = 1'b0;
+                    op_plus = 1'b0;
+                    op_multiply = 1'b0;
+                end
         endcase
-    end
+    end 
 
  
     //Result comparator
     assign correct = (alu_out == in)? 1:0;
+    assign rip_act1 = (alu_out == in)? 0:1;
 
     //High score comparator
     assign better = (score > high_score)? 1:0;
@@ -424,7 +454,7 @@ module datapath( clk, resetn, data_in, ld_ans, ld_q1, ld_q2, show_q, score, high
         end
     end
 
-
+    wire rip_act2 = 1'b0;
     //Time_counter
     always @(posedge clk)
     begin
@@ -444,15 +474,22 @@ module datapath( clk, resetn, data_in, ld_ans, ld_q1, ld_q2, show_q, score, high
 					end
 			end
 	end
-	
-	//assign rip_act = (timer == 8'b0)? 1 : 0;
 
-    /*
-    // x reset counter, different case for different number
-    always @(posedge clk)
+    assign rip_act2 = (timer==1'b0)? 1:0;
+	
+
+
+    reg [7:0] x_in;
+    reg [6:0] y_in;
+    reg [7:0] reset_counter1 = 159;
+    reg [6:0] reset_counter2 = 30;
+     
+    // x reset counter for painting everything black
+    always @(posedge clock)
     begin   
-        if (!resetn)
-            reset_counter1 <= 8'd159; 
+        if (!reset_n)
+            reset_counter1 <= 8'd159;   //thats why there are 160 bits for x
+            //reset_counter1 <= 8'd10;
         else if (erase) begin
             if (reset_counter1 == 8'd0)
                 reset_counter1 <= 8'd159;
@@ -460,46 +497,193 @@ module datapath( clk, resetn, data_in, ld_ans, ld_q1, ld_q2, show_q, score, high
                 reset_counter1 <= reset_counter1 - 1'b1;
         end
     end
-    */
 
-
-    /*
-    // y reset counter, different case for different number
-    always @(posedge clk)
+    // y reset counter for painting everything black
+    always @(posedge clock)
     begin   
-        if (!resetn)
+        if (!reset_n)
             reset_counter2 <= 7'd119;
-        else if (reset_counter1 == 8'd0)
+            //reset_counter2 <= 8'd10;
+        else if (reset_counter1 == 8'd0)  //thats why its depending on x to finish the row
             reset_counter2 <= reset_counter2 - 1'b1;
     end
-    */
 
-    /*
-    // draw counter, could be the same for every number?
+
+    reg [1:0] location = 0;
+    reg number = 1'd0;
+    reg done_dig = 1'd0;  
+
+    //location counter
+    always (posedge clk)
+    begin
+        if (!resetn)
+            location <= 1'b0;
+
+        else if (done_dig) begin
+            location <= location + 1'b1;
+            done_dig <= 1'd0;
+            if (location == 3) begin
+                location <= 2'b0;
+                number <= 1'd1;
+            end
+        end
+    end
+
+    reg one = 1'b0; 
+    reg zero = 1'b0;
+
+    //determine if a digit is one or zero
+    always @(posedge clk) begin
+        if (!resetn) begin
+            one <= 1'b0;
+            zero <= 1'b0;
+        end
+        else if (show_q) begin
+            
+        end
+    end
+
     always @(posedge clk)
     begin
-        if (draw) 
-            draw_counter <=  draw_counter + 1'b1;
-        else if (ready)
-            draw_counter = 4'b1111;
-        else if (!reset_n)
-            draw_counter <= 4'b0000;
+            if (one) begin
+                if (one_start) begin
+                    x_in <= 119 + (location) * 10 + 9; //digit is the digit of the number (e.g. in 0100 digit of "1" = 2)
+                    y_in <= 59 + (number) * 30; //number is the number of the question (q1 = 1 and q2 = 2)
+                    one_start <= 1'd0;
+                end
+                
+                else begin
+                    y_in <= y_in + 7'd1;
+                    if (y_in == 59 + (number) * 30 + 20)
+                        done_dig <= 1'd1;
+                end
+            end
+            
+            else if (zero) begin
+                if (zero_start) begin
+                    x_in <= 119 + (location) * 10 + 1;
+                    y_in <= 59 + (number) * 30;
+                    zero_start <= 1'd0;
+                end
+                else if (y_in == 59 + (number) * 30) begin
+                    x_in <= x_in + 8'd1;
+                    if (x_in == 119 + (location+1) * 10) begin
+                        x_in <= 119 + (location) * 10 + 1;
+                        y_in <= y_in + 7'd1;
+                    end
+                end
+                else if (y_in > 59 + (number) * 30 && y_in < 59 + (number) * 30 + 20) begin
+                    y_in <= y_in + 7'd1;
+                    if (x_in == 119 + (location) * 10 + 1 && y_in == 59 + (number) * 30 + 20) begin
+                        x_in <= 119 + (location) * 10 + 9;
+                        y_in <= 59 + (number) * 30 + 1;
+                    end
+                    else if (x_in == 119 + (location) * 10 + 9 && y_in == 59 + (number) * 30 + 20) begin
+                        x_in <= 119 + (location) * 10 + 1;
+                    end
+                end
+                else if (y_in == 59 + (number) * 30 + 20) begin
+                    x_in <= x_in + 8'd1;
+                    if (x_in == 119 + (location) * 10 + 9) begin
+                        done_dig <= 1'd1;
+                    end
+                end
+            end
     end
-    */
+  
 
-    
-    //RIP_activation
+    reg op_plus_begin = 1'b1;
+    reg op_minus_begin = 1'b1; 
+    reg op_multiply_begin = 1'b1;
 
-    //RIP_counter
+    reg done_op = 1'b0;
+    reg down, up = 1'b0;
+    //input operator
+    always @(posedge clk)
+    begin
+        if (operator) begin
+            if (op_plus) begin
+                if (op_plus_begin) begin
+                x_in <= 8'd110;
+                y_in <= 7'd99;
+                op_plus_begin <= 1'd0;
+                end
+                else if (y_in == 7'd99) begin
+                    x_in <= x_in + 8'd1;
+                    if (x_in == 8'd119) begin
+                        x_in <= 8'd114;
+                        y_in <= 7'd94;
+                    end
+                end
+                else if (x_in == 114 && y_in != 7'd99) begin
+                    y_in <= y_in + 7'd1;
+                    if (y_in == 7'd99) begin
+                        y_in <= y_in + 7'd1;
+                    end
+                    else if (y_in == 7'd104) begin
+                        done_op = 1'b1;
+                    end
+                end
+            end
+        
+            else if (op_minus) begin
+                if (op_minus_begin) begin
+                    x_in <= 8'd110;
+                    y_in <= 7'd99;
+                    op_minus_begin <= 1'd0;
+                end
+                else if (y_in == 7'd99) begin
+                    x_in <= x_in + 8'd1;
+                    if (x_in == 8'd118) begin
+                        done_op <= 1'b1;
+                    end
+                end
+            end
+        
+            else if (op_multiply) begin
+                if (op_multiply_begin) begin
+                    x_in <= 8'd110;
+                    y_in <= 7'd94;
+                    op_multiply_begin <= 1'd0;
+                    down <= 1'd1;
+                end
+                else if (down) begin
+                    x_in <= x_in + 1'd1;
+                    y_in <= y_in + 1'd1;
+                    if (x_in == 8'd119) begin
+                        x_in <= 8'd110;
+                        y_in <= y_in - 7'd1;
+                        down <= 1'd0;
+                        up <= 1'd1;
+                    end
+                end
+                else if (up) begin
+                    x_in <= x_in + 1'd1;
+                    y_in <= y_in - 1'd1;
+                    if (x_in == 8'd118) begin
+                        down <= 1'd0;
+                        done_op <= 1'd1;
+                    end
+                end
+            end
+        end
+    end
 
+    //rip_draw
+    always @(posedge clk) 
+    begin
+        if (rip_draw) begin
+            
+        end
+    end
 
-    //
-
-    assign x_out = erase ? reset_counter1: alu_x_out;
-    assign y_out = erase ? reset_counter2: alu_y_out;
-    assign colour_out = erase ? 3'b000: colour_in;
-    assign black = !reset_counter1 & !reset_counter2;
-    //assign finish = draw_counter[0] & draw_counter[1] & draw_counter[2] & draw_counter[3];
+    assign rip_act = rip_act1 || rip_act2;
+    assign x_out = erase ? reset_counter1: x_in;
+    assign y_out = erase ? reset_counter2: y_in;
+    assign colour_out = erase ? 3'b000: 3'b111;    //if erase, choose color black
+    assign black = !reset_counter1 & !reset_counter2;  //only completely black when both reset_counter are zero
+    assign q_finish = //finish question
+    assign o_finish = (done_op == 1'b1)? 1:0;
     
 endmodule
 
